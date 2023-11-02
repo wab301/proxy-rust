@@ -1,0 +1,21 @@
+[package]
+name = "proxy-rust"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+#[profile.release]
+#lto = true
+#panic = 'abort'
+#opt-level = 'z'  # 优化级别选择 z
+#codegen-units = 1  # 代码生成单元设置为 1
+
+[dependencies]
+structopt = "0.3"
+tokio = { version = "1.32.0", features = ["full"] }
+bytes = "1.5.0"
+rust-crypto = "0.2.36"
+base64 = "0.13"
+md5 = "0.7"
+rand = "0.8.5"

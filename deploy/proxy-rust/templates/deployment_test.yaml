@@ -1,0 +1,134 @@
+{{- if .Values.test.enabled -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "proxy-rust.fullname" . }}-test-server
+  labels:
+    {{- include "proxy-rust.labels" . | nindent 4 }}
+    app.kubernetes.io/name: proxy-rust-test-server
+spec:
+  replicas: {{ .Values.test.server.replicas }}
+  selector:
+    matchLabels:
+      {{- include "proxy-rust.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: proxy-rust-test-server
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "proxy-rust.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: proxy-rust-test-server
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      dnsPolicy: ClusterFirstWithHostNet
+      hostNetwork: true
+      containers:
+        - name: {{ .Chart.Name }}-test-server
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -xeuc
+            - |
+              exec /data/proxy-rust/bin/server
+          env:
+            - name: NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: HOST
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+          {{- range $key, $value := .Values.test.server.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+          {{- end}}
+          resources:
+            {{- toYaml .Values.test.server.resources | nindent 12 }}
+      {{- with .Values.test.server.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.test.server.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.test.server.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "proxy-rust.fullname" . }}-test-client
+  labels:
+    {{- include "proxy-rust.labels" . | nindent 4 }}
+    app.kubernetes.io/name: proxy-rust-test-client
+spec:
+  replicas: {{ .Values.test.client.replicas }}
+  selector:
+    matchLabels:
+      {{- include "proxy-rust.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/name: proxy-rust-test-client
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "proxy-rust.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: proxy-rust-test-client
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}-test-client
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command:
+            - /bin/bash
+            - -xeuc
+            - |
+              exec /data/proxy-rust/bin/client 
+          env:
+          {{- range $key, $value := .Values.test.client.env }}
+            - name: {{ $key }}
+              value: "{{ $value }}"
+          {{- end }}
+          resources:
+            {{- toYaml .Values.test.client.resources | nindent 12 }}
+      {{- with .Values.test.client.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.test.client.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.test.client.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+{{- end }}

@@ -1,0 +1,28 @@
+{{- $root := . -}}
+{{- range $name, $svc := .Values.services -}}
+{{ print "---" }}
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    {{- include "proxy-rust.labels" $root | nindent 4 }}
+{{- if $svc.annotations }}
+  annotations:
+{{ toYaml $svc.annotations | indent 4 }}
+{{- end }}
+  name: {{ include "proxy-rust.fullname" $root }}-{{ $name }}-svc
+spec:
+  ports:
+    - name: proxy-rust
+      port: {{ $svc.port }}
+      protocol: TCP
+      targetPort: {{ $svc.targetPort }}
+  selector:
+    {{- include "proxy-rust.selectorLabels" $root | nindent 4 }}
+  sessionAffinity: None
+  type: {{ $svc.type }}
+{{- if eq $svc.type "LoadBalancer" }}
+  externalTrafficPolicy: Local
+{{- end }}
+{{ print "\n" }}
+{{- end -}}

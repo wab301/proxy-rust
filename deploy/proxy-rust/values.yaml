@@ -1,0 +1,143 @@
+# Default values for proxy-rust.
+# This is a YAML-formatted file.
+# Declare variables to be passed into your templates.
+
+replicaCount: 1
+
+image:
+  repository: wab301/proxy-rust
+  pullPolicy: IfNotPresent
+  # Overrides the image tag whose default is the chart appVersion.
+  tag: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+podSecurityContext: {}
+  # fsGroup: 2000
+
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
+services:
+  china:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/alicloud-loadbalancer-address-type: intranet
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-cert-id: ""
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-status: "off"
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-id: ""
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-acl-type: "white"
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-flag: 'on'
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-interval: '2'
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-timeout: '5'
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-health-check-type: tcp
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-healthy-threshold: '3'
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-protocol-port: "tcp:6001"
+      # service.beta.kubernetes.io/alibaba-cloud-loadbalancer-unhealthy-threshold: '3'
+      # service.beta.kubernetes.io/alicloud-loadbalancer-force-override-listeners: 'true'
+      # service.beta.kubernetes.io/alicloud-loadbalancer-id: ""
+    port: 6001
+    targetPort: 6001
+
+resources: {}
+  # We usually recommend not to specify default resources and to leave this as a conscious
+  # choice for the user. This also increases chances charts run on environments with little
+  # resources, such as Minikube. If you do want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  # limits:
+  #   cpu: 100m
+  #   memory: 128Mi
+  # requests:
+  #   cpu: 100m
+  #   memory: 128Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  # targetMemoryUtilizationPercentage: 80
+  externals:
+  # - type: External
+  #   external:
+  #     metric:
+  #       name: slb_l7_qps
+  #       selector:
+  #         matchLabels:
+  #           slb.instance.id: ""
+  #           slb.instance.port: "1000"
+  #     target:
+  #       type: AverageValue
+  #       averageValue: 100
+
+nodeSelector:
+  # machine_type: proxy
+
+tolerations:
+  # - key: "server-type"
+  #   operator: "Equal"
+  #   value: "proxy"
+  #   effect: "NoSchedule"
+
+affinity:
+  # podAntiAffinity:
+  #   preferredDuringSchedulingIgnoredDuringExecution:
+  #     - podAffinityTerm:
+  #         labelSelector:
+  #           matchExpressions:
+  #           - key: app.kubernetes.io/name
+  #             operator: In
+  #             values:
+  #             - proxy-rust
+  #         topologyKey: kubernetes.io/hostname
+  #       weight: 100
+
+env:
+  SECRET: "M6v4BRai406"
+  REUSE: "true"
+  RETRY: "3"
+  TIMEOUT: "5"
+
+hostNetwork: true
+
+test:
+  enabled: false
+  server:
+    replicas: 1
+    env:
+      SECRET: "M6v4BRai406"
+    nodeSelector:
+      # machine_type: server
+    tolerations:
+      # - key: "server-type"
+      #   operator: "Equal"
+      #   value: "server"
+      #   effect: "NoSchedule"
+  client:
+    replicas: 1
+    env:
+      PROXY_ADDR: "127.0.0.1:6001"
+      SERVER_ADDR: "127.0.0.1:6002"
+      NUM: 2
+      WAIT: 33
+      SECRET: "M6v4BRai406"
+    nodeSelector:
+    tolerations:
