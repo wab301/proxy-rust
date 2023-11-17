@@ -60,12 +60,20 @@ impl Proxy {
                 tokio::spawn(async move {
                     match tokio::io::copy(&mut agent_rd, &mut wr).await {
                         Ok(_) => {},
-                        Err(err) => println!("copy data to client error: {}",err),
+                        Err(err) => {
+                            if err.kind() != std::io::ErrorKind::BrokenPipe {
+                                println!("copy data to client error: {}",err);
+                            }
+                        },
                     }
                 });
                 match tokio::io::copy(&mut rd, &mut agent_wr).await {
                     Ok(_) => {},
-                    Err(err) => println!("copy data to agent error: {}",err),
+                    Err(err) => {
+                            if err.kind() != std::io::ErrorKind::ConnectionReset {
+                                println!("copy data to agent error: {}",err);
+                            }
+                        },
                 }
         }
     }
