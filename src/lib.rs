@@ -70,10 +70,13 @@ impl Proxy {
                 match tokio::io::copy(&mut rd, &mut agent_wr).await {
                     Ok(_) => {},
                     Err(err) => {
-                            if err.kind() != std::io::ErrorKind::ConnectionReset {
-                                println!("copy data to agent error: {}",err);
-                            }
-                        },
+                        match err.kind() {
+                            std::io::ErrorKind::ConnectionReset |
+                            std::io::ErrorKind::BrokenPipe |
+                            std::io::ErrorKind::TimedOut => {},
+                            _ => println!("copy data to agent error: {}", err),
+                        }
+                    },
                 }
         }
     }

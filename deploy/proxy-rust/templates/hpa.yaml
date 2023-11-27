@@ -14,11 +14,7 @@ spec:
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   behavior:
     scaleDown:
-      stabilizationWindowSeconds: 300
-      policies:
-      - type: Pods
-        value: 0
-        periodSeconds: 60
+      selectPolicy: Disabled
     scaleUp:
       stabilizationWindowSeconds: 0
       policies:
