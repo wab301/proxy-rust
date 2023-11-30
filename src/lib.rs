@@ -53,35 +53,7 @@ impl Proxy {
         });
     }
 
-    async fn handle( socket: TcpStream, timeout_sec: u64, retry: u8, secret: &str) {
-        if let Some((socket,agent)) = Proxy::handshake(socket, timeout_sec, retry, secret).await {
-                let (mut rd,mut wr) = tokio::io::split(socket);
-                let (mut agent_rd, mut agent_wr) = tokio::io::split(agent);
-                tokio::spawn(async move {
-                    match tokio::io::copy(&mut agent_rd, &mut wr).await {
-                        Ok(_) => {},
-                        Err(err) => {
-                            if err.kind() != std::io::ErrorKind::BrokenPipe {
-                                println!("copy data to client error: {}",err);
-                            }
-                        },
-                    }
-                });
-                match tokio::io::copy(&mut rd, &mut agent_wr).await {
-                    Ok(_) => {},
-                    Err(err) => {
-                        match err.kind() {
-                            std::io::ErrorKind::ConnectionReset |
-                            std::io::ErrorKind::BrokenPipe |
-                            std::io::ErrorKind::TimedOut => {},
-                            _ => println!("copy data to agent error: {}", err),
-                        }
-                    },
-                }
-        }
-    }
-
-    async fn handshake(mut socket: TcpStream, timeout_sec: u64, retry: u8, secret: &str) -> Option<(TcpStream,TcpStream)> {
+    async fn handle(mut socket: TcpStream, timeout_sec: u64, retry: u8, secret: &str) {
         let mut buf = BytesMut::with_capacity(64);
         let (addr, remain) = loop {
             if let Some(num) = buf.iter().position(|b| *b == b'\n') {
@@ -91,16 +63,16 @@ impl Proxy {
                     break (address, &buf[num+1..]);
                 }
                 let _ = socket.write(CODE_BAD_ADDR).await;
-                return None;
+                return;
             }
 
             match socket.read_buf(&mut buf).await {
                 Ok(size) => {
                     if size == 0 {
-                        return None;
+                        return;
                     }
                 },
-                Err(_) => { let _ = socket.write(CODE_BAD_REQ).await; return None},
+                Err(_) => { let _ = socket.write(CODE_BAD_REQ).await; return},
             };
         };
 
@@ -110,21 +82,28 @@ impl Proxy {
             match result {
                 Ok(Ok(mut agent_socket)) => {
                     if socket.write(CODE_OK).await.is_err() {
-                        return None;
+                        return;
                     }
 
                     if remain.len() > 0 {
                         if agent_socket.write(remain).await.is_err() {
-                            return None;
+                            return;
                         }
                     }
 
-                    return Some((socket, agent_socket))
+                    let _ = tokio::io::copy_bidirectional(&mut socket,&mut agent_socket).await;
+                    let _ = agent_socket.shutdown().await;
+                    // 只关闭read防止服务器存在大量FIN_WAIT2
+                    match socket.into_std() {
+                        Ok(socket_std) => {let _ = socket_std.shutdown(std::net::Shutdown::Read);},
+                        Err(_) => return,
+                    };
+                    return;
                 },
                 Ok(Err(_)) => {
                     // 连接失败
                     let _ = socket.write(CODE_DIAL_ERR).await; 
-                    return None;
+                    return;
                 },
                 Err(_) => {
                     // 连接超时
@@ -134,7 +113,7 @@ impl Proxy {
 
         // 连接超时
         let _ = socket.write(CODE_DIAL_TIMEOUT).await;
-        return None;
+        return;
     }
 }
 
