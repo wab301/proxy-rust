@@ -2,6 +2,7 @@ pub use structopt::StructOpt;
 use tokio::{net::{TcpListener, TcpStream}, io::{AsyncReadExt, AsyncWriteExt}, time::{Duration, timeout}};
 use bytes::BytesMut;
 pub mod aes256cbc;
+mod copy_bidirectional;
 
 const CODE_OK: &[u8] = "200".as_bytes();
 const CODE_BAD_REQ: &[u8] = "400".as_bytes();
@@ -63,16 +64,22 @@ impl Proxy {
                     break (address, &buf[num+1..]);
                 }
                 let _ = socket.write(CODE_BAD_ADDR).await;
+                let _ = Proxy::close_stream(socket);
                 return;
             }
 
             match socket.read_buf(&mut buf).await {
                 Ok(size) => {
                     if size == 0 {
+                        let _ = Proxy::close_stream(socket);
                         return;
                     }
                 },
-                Err(_) => { let _ = socket.write(CODE_BAD_REQ).await; return},
+                Err(_) => { 
+                    let _ = socket.write(CODE_BAD_REQ).await;
+                    let _ = Proxy::close_stream(socket);
+                    return;
+                },
             };
         };
 
@@ -82,27 +89,28 @@ impl Proxy {
             match result {
                 Ok(Ok(mut agent_socket)) => {
                     if socket.write(CODE_OK).await.is_err() {
+                        let _ = Proxy::close_stream(agent_socket);
+                        let _ = Proxy::close_stream(socket);
                         return;
                     }
 
                     if remain.len() > 0 {
                         if agent_socket.write(remain).await.is_err() {
+                            let _ = Proxy::close_stream(agent_socket);
+                            let _ = Proxy::close_stream(socket);
                             return;
                         }
                     }
 
-                    let _ = tokio::io::copy_bidirectional(&mut socket,&mut agent_socket).await;
-                    let _ = agent_socket.shutdown().await;
-                    // 只关闭read防止服务器存在大量FIN_WAIT2
-                    match socket.into_std() {
-                        Ok(socket_std) => {let _ = socket_std.shutdown(std::net::Shutdown::Read);},
-                        Err(_) => return,
-                    };
+                    let _ = copy_bidirectional::copy_bidirectional(&mut socket,&mut agent_socket).await;
+                    let _ = Proxy::close_stream(agent_socket);
+                    let _ = Proxy::close_stream(socket);
                     return;
                 },
                 Ok(Err(_)) => {
                     // 连接失败
-                    let _ = socket.write(CODE_DIAL_ERR).await; 
+                    let _ = socket.write(CODE_DIAL_ERR).await;
+                    let _ = Proxy::close_stream(socket);
                     return;
                 },
                 Err(_) => {
@@ -113,7 +121,11 @@ impl Proxy {
 
         // 连接超时
         let _ = socket.write(CODE_DIAL_TIMEOUT).await;
-        return;
+        let _ = Proxy::close_stream(socket);
+    }
+
+    fn close_stream(socket: TcpStream) -> Result<(), Box<dyn std::error::Error>> {
+        socket.into_std()?.shutdown(std::net::Shutdown::Both)?;
+        Ok(())
     }
 }
-
